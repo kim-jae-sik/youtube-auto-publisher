@@ -14,6 +14,8 @@ logs/
 # Secret & OAuth Tokens (IMPORTANT: DO NOT COMMIT CREDENTIALS)
 youtube_token.json
 client_secrets.json
+generate_token_direct.py
+run_oauth.py
 .env
 
 # OS generated files
