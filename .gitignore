@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Temporary & Output Directories
+output/
+temp_*/
+logs/
+*.mp4
+*.wav
+*.mp3
+
+# Secret & OAuth Tokens (IMPORTANT: DO NOT COMMIT CREDENTIALS)
+youtube_token.json
+client_secrets.json
+.env
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+.DS_Store
