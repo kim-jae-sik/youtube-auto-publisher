@@ -551,10 +551,12 @@ async def render_video(topic, out_mp4):
                 f_path = os.path.join(TEMP_DIR, f"sc_{sid}_f{st_i}.png")
                 f_img.save(f_path)
                 frame_paths.append(f_path)
-                f.write(f"file '{os.path.abspath(f_path).replace('\\', '/')}'\n")
+                clean_f = os.path.abspath(f_path).replace("\\", "/")
+                f.write(f"file '{clean_f}'\n")
                 f.write(f"duration {dur_per_sent:.3f}\n")
             if frame_paths:
-                f.write(f"file '{os.path.abspath(frame_paths[-1]).replace('\\', '/')}'\n")
+                clean_last = os.path.abspath(frame_paths[-1]).replace("\\", "/")
+                f.write(f"file '{clean_last}'\n")
 
         sc_video = os.path.join(TEMP_DIR, f"sc_{sid}_clip.mp4")
         cmd_enc = [
@@ -608,7 +610,8 @@ async def render_video(topic, out_mp4):
     master_concat = os.path.join(TEMP_DIR, "master_concat.txt")
     with open(master_concat, "w", encoding="utf-8") as f:
         for sc in scene_clips:
-            f.write(f"file '{os.path.abspath(sc).replace('\\', '/')}'\n")
+            clean_sc = os.path.abspath(sc).replace("\\", "/")
+            f.write(f"file '{clean_sc}'\n")
 
     master_speech = os.path.join(TEMP_DIR, "master_speech.mp4")
     cmd_cat = [FFMPEG_EXE, "-y", "-f", "concat", "-safe", "0", "-i", master_concat, "-c", "copy", master_speech]
