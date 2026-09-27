@@ -64,13 +64,13 @@ def get_cloud_font(size, bold=True):
                 pass
     return ImageFont.load_default()
 
-FONT_HEADER = get_cloud_font(26, bold=True)
-FONT_TITLE = get_cloud_font(46, bold=True)
+FONT_HEADER = get_cloud_font(28, bold=True)
+FONT_TITLE = get_cloud_font(48, bold=True)
 FONT_SUBTITLE = get_cloud_font(26, bold=False)
-FONT_CARD_TITLE = get_cloud_font(30, bold=True)
-FONT_CARD_BODY = get_cloud_font(23, bold=False)
-FONT_SUB = get_cloud_font(29, bold=True)
-FONT_SMALL = get_cloud_font(19, bold=True)
+FONT_CARD_TITLE = get_cloud_font(32, bold=True)
+FONT_CARD_BODY = get_cloud_font(26, bold=True)
+FONT_SUB = get_cloud_font(36, bold=True)
+FONT_SMALL = get_cloud_font(20, bold=True)
 
 FONT_THUMB_BADGE = get_cloud_font(32, bold=True)
 FONT_THUMB_MAIN = get_cloud_font(68, bold=True)
@@ -189,9 +189,39 @@ def generate_ambient_bgm(duration_sec, out_path):
         if frames:
             wav.writeframes(frames)
 
-# 16:9 슬라이드 프레임 렌더링
+# 한글 텍스트 자동 줄바꿈 함수 (박스 넘침 완전 방지)
+def wrap_text(draw, text, font, max_width):
+    lines = []
+    words = text.split(" ")
+    current_line = ""
+    for word in words:
+        test_line = f"{current_line} {word}".strip()
+        bbox = draw.textbbox((0, 0), test_line, font=font)
+        if bbox[2] - bbox[0] <= max_width:
+            current_line = test_line
+        else:
+            if current_line:
+                lines.append(current_line)
+            w_bbox = draw.textbbox((0, 0), word, font=font)
+            if w_bbox[2] - w_bbox[0] > max_width:
+                cur_chars = ""
+                for char in word:
+                    t_chars = cur_chars + char
+                    if draw.textbbox((0, 0), t_chars, font=font)[2] <= max_width:
+                        cur_chars = t_chars
+                    else:
+                        lines.append(cur_chars)
+                        cur_chars = char
+                current_line = cur_chars
+            else:
+                current_line = word
+    if current_line:
+        lines.append(current_line)
+    return lines
+
+# 16:9 슬라이드 프레임 렌더링 (영문/깨진 이모지 완전 삭제 & 고가독성 한글화 & 자동 줄바꿈)
 def draw_scene_frame(scene, topic):
-    img = Image.new("RGB", (1920, 1080), color=(10, 13, 20))
+    img = Image.new("RGB", (1920, 1080), color=(10, 14, 23))
     draw = ImageDraw.Draw(img)
 
     accent_map = {
@@ -203,72 +233,84 @@ def draw_scene_frame(scene, topic):
     }
     accent_rgb = accent_map.get(scene.get("bg_theme", "cyan"), (6, 182, 212))
 
+    # 부드러운 배경 앰비언트 글로우
     for r in range(450, 0, -50):
         glow_color = (
             int(10 + accent_rgb[0] * 0.08 * (1 - r / 450)),
-            int(13 + accent_rgb[1] * 0.08 * (1 - r / 450)),
-            int(20 + accent_rgb[2] * 0.08 * (1 - r / 450))
+            int(14 + accent_rgb[1] * 0.08 * (1 - r / 450)),
+            int(23 + accent_rgb[2] * 0.08 * (1 - r / 450))
         )
         draw.ellipse([960 - r * 2, 540 - r, 960 + r * 2, 540 + r], fill=glow_color)
 
-    for y in range(80, 1000, 140):
-        draw.line([(60, y), (1860, y)], fill=(20, 24, 38), width=1)
-    for x in range(120, 1860, 200):
-        draw.line([(x, 80), (x, 960)], fill=(18, 22, 34), width=1)
+    # 1. 상단 바: 영문 및 깨진 이모지 완전 삭제! 깔끔한 채널 브랜드 & 진행 상황만 표시
+    draw.rectangle([60, 30, 1860, 86], fill=(16, 22, 36), outline=(45, 55, 75), width=1)
+    draw.rectangle([78, 42, 114, 74], fill=(255, 0, 51))
+    draw.polygon([(92, 50), (92, 66), (105, 58)], fill=(255, 255, 255))
+    draw.text((128, 44), "이심전심 이야기", fill=(255, 255, 255), font=FONT_HEADER)
 
-    draw.rectangle([60, 32, 1860, 90], fill=(15, 18, 28), outline=(40, 46, 68), width=1)
-    draw.rectangle([78, 44, 114, 78], fill=(255, 0, 51))
-    draw.polygon([(92, 52), (92, 70), (105, 61)], fill=(255, 255, 255))
-    draw.text((128, 48), "이심전심 이야기 CLOUD YOUTUBE ENGINE", fill=(240, 243, 248), font=FONT_HEADER)
+    # 우측 상단 씬 회차 뱃지
+    draw.rounded_rectangle([1600, 42, 1842, 74], radius=10, fill=accent_rgb)
+    draw.text((1626, 45), f"제 {scene['id']:02d} 화 / 총 14 화", fill=(255, 255, 255), font=FONT_HEADER)
 
-    draw.rounded_rectangle([760, 44, 970, 78], radius=14, fill=(6, 182, 212, 40), outline=(6, 182, 212), width=1)
-    draw.text((776, 50), "📐 16:9 Widescreen", fill=(103, 232, 249), font=FONT_SMALL)
-
-    draw.rounded_rectangle([984, 44, 1170, 78], radius=14, fill=(16, 185, 129, 40), outline=(16, 185, 129), width=1)
-    draw.text((998, 50), "⏱️ 10분+ 롱폼 전문", fill=(110, 231, 183), font=FONT_SMALL)
-
+    # 상단 진행 바
     prog_ratio = scene["id"] / 14.0
     bar_w = int((1860 - 60) * prog_ratio)
-    draw.rectangle([60, 90, 60 + bar_w, 94], fill=accent_rgb)
+    draw.rectangle([60, 86, 1860, 90], fill=(30, 40, 60))
+    draw.rectangle([60, 86, 60 + bar_w, 90], fill=accent_rgb)
 
-    draw.rounded_rectangle([1530, 44, 1842, 78], radius=14, fill=accent_rgb)
-    draw.text((1546, 49), f"SCENE {scene['id']:02d} / 14", fill=(255, 255, 255), font=FONT_HEADER)
+    # 2. 메인 타이틀 & 서브타이틀 (굵고 선명한 화이트/실버)
+    draw.text((80, 115), scene["title"], fill=(255, 255, 255), font=FONT_TITLE)
+    draw.text((80, 175), scene["subtitle"], fill=(203, 213, 225), font=FONT_SUBTITLE)
 
-    draw.text((100, 118), scene["title"], fill=(255, 255, 255), font=FONT_TITLE)
-    draw.text((100, 180), scene["subtitle"], fill=(156, 163, 175), font=FONT_SUBTITLE)
+    # 3. 좌측 카드: 핵심 강의 및 원리 해설 (자동 줄바꿈으로 박스 넘침 100% 방지)
+    draw.rounded_rectangle([80, 230, 1060, 820], radius=18, fill=(18, 24, 38), outline=accent_rgb, width=2)
+    draw.text((115, 260), "📌 핵심 내용 및 실전 분석", fill=accent_rgb, font=FONT_CARD_TITLE)
 
-    draw.rounded_rectangle([100, 240, 930, 800], radius=18, fill=(18, 22, 34), outline=accent_rgb, width=2)
-    draw.text((130, 275), f"📌 {scene['title']}", fill=accent_rgb, font=FONT_CARD_TITLE)
-    for b_idx, b_txt in enumerate(scene.get("sentences", [])):
-        draw.text((130, 360 + b_idx * 95), f"• {b_txt}", fill=(225, 235, 245), font=FONT_CARD_BODY)
+    cur_y = 330
+    for sent in scene.get("sentences", []):
+        draw.text((115, cur_y), "•", fill=accent_rgb, font=FONT_CARD_BODY)
+        lines = wrap_text(draw, sent, FONT_CARD_BODY, 890)
+        for l in lines:
+            draw.text((145, cur_y), l, fill=(255, 255, 255), font=FONT_CARD_BODY)
+            cur_y += 38
+        cur_y += 16
 
-    draw.rounded_rectangle([970, 240, 1820, 800], radius=18, fill=(15, 18, 28), outline=(6, 182, 212), width=2)
-    draw.text((1000, 275), "📊 24/7 Cloud Autonomous Metrics", fill=(103, 232, 249), font=FONT_CARD_TITLE)
-    metrics = [
-        ("클라우드 무인 가동", "24/7 CLOUD ACTIVE", (16, 185, 129)),
-        ("유튜브 업로드 모드", "PUBLIC (전체 공개)", (245, 158, 11)),
-        ("누적 발행 성공", "AUTONOMOUS OK", (139, 92, 246)),
-        (topic["metric_label"], topic["val_metric"], (6, 182, 212))
+    # 4. 우측 카드: 핵심 체크 포인트 (불필요한 영어 지표 삭제, 가독성 높은 한글 카드)
+    draw.rounded_rectangle([1100, 230, 1840, 820], radius=18, fill=(15, 20, 32), outline=(139, 92, 246), width=2)
+    draw.text((1135, 260), "⚡ 핵심 체크 포인트 (Key Insights)", fill=(196, 181, 253), font=FONT_CARD_TITLE)
+
+    boxes = [
+        ("💡 오늘의 핵심 키워드", topic.get("keyword", "AI 비즈니스"), (253, 224, 71)),
+        ("🎯 시스템 기대 효과", topic.get("val_metric", "업무 90% 이상 단축"), (52, 211, 153)),
+        ("🔄 코어 연결 방식", "구글 시트 + Gemini 무료 API 인프라", (103, 232, 249)),
+        ("📢 시청 가이드", "화면 속 작동 원리를 바탕으로 직접 실습해 보세요", (244, 114, 182))
     ]
-    for idx, (lbl, val, col) in enumerate(metrics):
-        bx = 1000 + (idx % 2) * 390
-        by = 350 + (idx // 2) * 190
-        draw.rounded_rectangle([bx, by, bx + 360, by + 160], radius=14, fill=(22, 26, 40), outline=(50, 58, 80), width=1)
-        draw.text((bx + 20, by + 30), lbl, fill=(148, 163, 184), font=FONT_CARD_BODY)
-        draw.text((bx + 20, by + 80), val, fill=col, font=FONT_CARD_TITLE)
+
+    for idx, (lbl, val, col) in enumerate(boxes):
+        by = 330 + idx * 115
+        draw.rounded_rectangle([1135, by, 1805, by + 95], radius=12, fill=(24, 30, 48), outline=(60, 72, 100), width=1)
+        draw.text((1155, by + 15), lbl, fill=(160, 174, 192), font=FONT_SUBTITLE)
+        val_lines = wrap_text(draw, val, FONT_CARD_BODY, 620)
+        for vl_i, vl in enumerate(val_lines[:2]):
+            draw.text((1155, by + 50 + vl_i * 30), vl, fill=col, font=FONT_CARD_BODY)
 
     return img
 
+# 하단 자막 렌더링 (굵은 36pt 노란색 고대비 & 긴 문장 자동 2줄 중앙 정렬)
 def render_subtitle(base_img, sub_text):
     img = base_img.copy()
     draw = ImageDraw.Draw(img)
     if sub_text:
-        draw.rounded_rectangle([140, 840, 1780, 950], radius=16, fill=(8, 10, 16), outline=(139, 92, 246), width=2)
-        bbox = draw.textbbox((0, 0), sub_text, font=FONT_SUB)
-        tw = bbox[2] - bbox[0]
-        tx = max(160, (1920 - tw) // 2)
-        ty = 875
-        draw.text((tx, ty), sub_text, fill=(255, 255, 255), font=FONT_SUB)
+        lines = wrap_text(draw, sub_text, FONT_SUB, 1600)
+        card_h = 100 if len(lines) <= 1 else 135
+        card_y = 850 if len(lines) <= 1 else 830
+        draw.rounded_rectangle([100, card_y, 1820, card_y + card_h], radius=16, fill=(10, 14, 22), outline=(253, 224, 71), width=2)
+        start_y = card_y + (28 if len(lines) <= 1 else 18)
+        for l_idx, line in enumerate(lines[:2]):
+            bbox = draw.textbbox((0, 0), line, font=FONT_SUB)
+            tw = bbox[2] - bbox[0]
+            tx = (1920 - tw) // 2
+            draw.text((tx, start_y + l_idx * 48), line, fill=(255, 235, 59), font=FONT_SUB)
     return img
 
 # 16:9 썸네일 생성
