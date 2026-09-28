@@ -27,6 +27,17 @@ if sys.stdout.encoding != 'utf-8':
 from PIL import Image, ImageDraw, ImageFont
 import edge_tts
 
+# Google AI Ultra 엔진 로드 (최상위 모델)
+import sys as _sys
+_curr_dir = os.path.dirname(os.path.abspath(__file__))
+_sys.path.insert(0, _curr_dir)
+_sys.path.insert(0, os.path.join(_curr_dir, ".."))
+try:
+    import google_ultra_engine
+    ULTRA_AVAILABLE = True
+except ImportError:
+    ULTRA_AVAILABLE = False
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 TEMP_DIR = os.path.join(BASE_DIR, "temp_cloud_render")
