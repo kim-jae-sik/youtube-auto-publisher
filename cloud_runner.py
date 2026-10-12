@@ -575,6 +575,31 @@ def get_master_scenes(topic):
         }
     ]
 
+# 음성 합성 재시도 및 비상 대체 엔진 (Microsoft 403 차단 방어)
+async def generate_speech_with_retry(text, out_path, rate="-14%", max_retries=5):
+    voices = ["ko-KR-SunHiNeural", "ko-KR-InJoonNeural", "ko-KR-HyunsuNeural"]
+    for attempt in range(1, max_retries + 1):
+        voice = voices[(attempt - 1) % len(voices)]
+        try:
+            comm = edge_tts.Communicate(text, voice, rate=rate)
+            await comm.save(out_path)
+            if os.path.exists(out_path) and os.path.getsize(out_path) > 500:
+                return True
+        except Exception as e:
+            print(f"⚠️ [TTS 음성 생성 재시도 {attempt}/{max_retries}] ({voice}) 오류: {e}")
+            await asyncio.sleep(2.0 * attempt)
+
+    # 비상 Fallback (gTTS)
+    try:
+        from gtts import gTTS
+        print("🔄 [비상 전환] Edge-TTS 서버 응답 없음 -> Google gTTS로 비상 생성 중...")
+        tts = gTTS(text=text, lang="ko")
+        tts.save(out_path)
+        return True
+    except Exception as ge:
+        print(f"❌ [비상 음성 생성 실패]: {ge}")
+        return False
+
 # 비디오 렌더링 함수
 async def render_video(topic, out_mp4):
     print("==============================================================")
@@ -587,8 +612,9 @@ async def render_video(topic, out_mp4):
     for s in scenes:
         sid = s["id"]
         sc_audio = os.path.join(TEMP_DIR, f"sc_{sid}.mp3")
-        comm = edge_tts.Communicate(s["script"], "ko-KR-SunHiNeural", rate="-14%")
-        await comm.save(sc_audio)
+        ok = await generate_speech_with_retry(s["script"], sc_audio, rate="-14%")
+        if not ok:
+            print(f"⚠️ [경고] 씬 {sid} 음성 생성 실패, 기본 텍스트 대기음 생성")
         dur = get_audio_duration(sc_audio)
         total_audio_sec += dur
 
